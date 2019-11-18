@@ -1,0 +1,9 @@
+ttk_add_vtk_library(ttkTensorMonotonousSubdivision
+  SOURCES
+    ttkTensorMonotonousSubdivision.cpp
+  HEADERS
+    ttkTensorMonotonousSubdivision.h
+  LINK
+    tensorMonotonousSubdivision
+    ttkTriangulation
+    )
