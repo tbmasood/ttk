@@ -191,44 +191,17 @@ private:
 			float v3_x, v3_y, v3_z;
 			inputTriangl_->getVertexPoint(v3, v3_x, v3_y, v3_z);
 
-			float div = (v2_y - v3_y) * (v1_x - v3_x)
-					+ (v3_x - v2_x) * (v1_y - v3_y);
+			float Ex = v1_E - v3_E;
+			float Fx = v1_F - v3_F;
+			float Gx = v1_G - v3_G;
 
-			float Ex = (v2_y - v3_y) * v1_E + (v3_y - v1_y) * v2_E
-					+ (v1_y - v2_y) * v3_E;
-			float Fx = (v2_y - v3_y) * v1_F + (v3_y - v1_y) * v2_F
-					+ (v1_y - v2_y) * v3_F;
-			float Gx = (v2_y - v3_y) * v1_G + (v3_y - v1_y) * v2_G
-					+ (v1_y - v2_y) * v3_G;
+			float Ey = v2_E - v3_E;
+			float Fy = v2_F - v3_F;
+			float Gy = v2_G - v3_G;
 
-			float Ey = (v3_x - v2_x) * v1_E + (v1_x - v3_x) * v2_E
-					+ (v2_x - v1_x) * v3_E;
-			float Fy = (v3_x - v2_x) * v1_F + (v1_x - v3_x) * v2_F
-					+ (v2_x - v1_x) * v3_F;
-			float Gy = (v3_x - v2_x) * v1_G + (v1_x - v3_x) * v2_G
-					+ (v2_x - v1_x) * v3_G;
-
-			float Ec = (v2_x * v3_y - v3_x * v2_y) * v1_E
-					+ (v3_x * v1_y - v1_x * v3_y) * v2_E
-					+ (v1_x * v2_y - v2_x * v1_y) * v3_E;
-			float Fc = (v2_x * v3_y - v3_x * v2_y) * v1_F
-					+ (v3_x * v1_y - v1_x * v3_y) * v2_F
-					+ (v1_x * v2_y - v2_x * v1_y) * v3_F;
-			float Gc = (v2_x * v3_y - v3_x * v2_y) * v1_G
-					+ (v3_x * v1_y - v1_x * v3_y) * v2_G
-					+ (v1_x * v2_y - v2_x * v1_y) * v3_G;
-
-			Ex /= div;
-			Fx /= div;
-			Gx /= div;
-
-			Ey /= div;
-			Fy /= div;
-			Gy /= div;
-
-			Ec /= div;
-			Fc /= div;
-			Gc /= div;
+			float Ec = v3_E;
+			float Fc = v3_F;
+			float Gc = v3_G;
 
 			float A = (Ex - Gx) * (Ex - Gx) + 4 * Fx * Fx;
 			float B = 2 * (Ex - Gx) * (Ey - Gy) + 8 * Fx * Fy;
@@ -243,97 +216,67 @@ private:
 			bool hasCrit = false;
 			float critX, critY, critZ;
 			if (H != 0) {
-				critX = (-2 * C * D + B * E) / H;
-				critY = (-2 * A * E + B * D) / H;
-				critZ = v1_z;
-				float alpha = ((v2_y - v3_y) * (critX - v3_x)
-						+ (v3_x - v2_x) * (critY - v3_y))
-						/ ((v2_y - v3_y) * (v1_x - v3_x)
-								+ (v3_x - v2_x) * (v1_y - v3_y));
-				float beta = ((v3_y - v1_y) * (critX - v3_x)
-						+ (v1_x - v3_x) * (critY - v3_y))
-						/ ((v2_y - v3_y) * (v1_x - v3_x)
-								+ (v3_x - v2_x) * (v1_y - v3_y));
+				float alpha = (-2 * C * D + B * E) / H;
+				float beta = (-2 * A * E + B * D) / H;
 				float gamma = 1 - alpha - beta;
 				hasCrit = alpha > 0 && beta > 0 && gamma > 0;
+				critX = alpha * v1_x + beta * v2_x + gamma * v3_x;
+				critY = alpha * v1_y + beta * v2_y + gamma * v3_y;
+				critZ = alpha * v1_z + beta * v2_z + gamma * v3_z;
+				triangleHasMinima[i] = hasCrit;
+				if (hasCrit) {
+					triangleCenters[3 * i + 0] = critX;
+					triangleCenters[3 * i + 1] = critY;
+					triangleCenters[3 * i + 2] = critZ;
+				}
 
-				float x0 = v1_x;
-				float y0 = v1_y;
-				float xd = v2_x - v1_x;
-				float yd = v2_y - v1_y;
-				alpha = A * xd * xd + B * xd * yd + C * yd * yd;
-				beta = 2 * A * x0 * xd + B * (y0 * xd + x0 * yd)
-						+ 2 * C * y0 * yd + D * xd + E * yd;
-				float t = -beta / (2 * alpha);
+				float t = (2 * A - B + D - E) / (2 * (A - B + C));
 				if (t > 0 && t < 1) {
 					edgeHasMinima[e1] = true;
-					float edgeCritX = x0 + t * xd;
-					float edgeCritY = y0 + t * yd;
-					edgeCenters[3 * e1 + 0] = edgeCritX;
-					edgeCenters[3 * e1 + 1] = edgeCritY;
-					edgeCenters[3 * e1 + 2] = v1_z;
-					float edgeMinVal = A * edgeCritX * edgeCritX
-							+ B * edgeCritX * edgeCritY
-							+ C * edgeCritY * edgeCritY + D * edgeCritX
-							+ E * edgeCritX + F;
-					edgeMinValues[e1] = edgeMinVal;
+					alpha = 1 - t;
+					beta = t;
+					gamma = 0;
+					edgeCenters[3 * e1 + 0] = alpha * v1_x + beta * v2_x;
+					edgeCenters[3 * e1 + 1] = alpha * v1_y + beta * v2_y;
+					edgeCenters[3 * e1 + 2] = alpha * v1_z + beta * v2_z;
+					edgeMinValues[e1] = A * alpha * alpha + B * alpha * beta
+							+ C * beta * beta + D * alpha + E * beta + F;
 				}
 
-				x0 = v2_x;
-				y0 = v2_y;
-				xd = v3_x - v2_x;
-				yd = v3_y - v2_y;
-				alpha = A * xd * xd + B * xd * yd + C * yd * yd;
-				beta = 2 * A * x0 * xd + B * (y0 * xd + x0 * yd)
-						+ 2 * C * y0 * yd + D * xd + E * yd;
-				t = -beta / (2 * alpha);
+				t = -E / (2 * C);
 				if (t > 0 && t < 1) {
 					edgeHasMinima[e2] = true;
-					float edgeCritX = x0 + t * xd;
-					float edgeCritY = y0 + t * yd;
-					edgeCenters[3 * e2 + 0] = edgeCritX;
-					edgeCenters[3 * e2 + 1] = edgeCritY;
-					edgeCenters[3 * e2 + 2] = v2_z;
-					float edgeMinVal = A * edgeCritX * edgeCritX
-							+ B * edgeCritX * edgeCritY
-							+ C * edgeCritY * edgeCritY + D * edgeCritX
-							+ E * edgeCritX + F;
-					edgeMinValues[e2] = edgeMinVal;
+					alpha = 0;
+					beta = t;
+					gamma = 1 - t;
+					edgeCenters[3 * e2 + 0] = beta * v2_x + gamma * v3_x;
+					edgeCenters[3 * e2 + 1] = beta * v2_y + gamma * v3_y;
+					edgeCenters[3 * e2 + 2] = beta * v2_z + gamma * v3_z;
+					edgeMinValues[e2] = C * beta * beta + E * beta + F;
 				}
 
-				x0 = v1_x;
-				y0 = v1_y;
-				xd = v3_x - v1_x;
-				yd = v3_y - v1_y;
-				alpha = A * xd * xd + B * xd * yd + C * yd * yd;
-				beta = 2 * A * x0 * xd + B * (y0 * xd + x0 * yd)
-						+ 2 * C * y0 * yd + D * xd + E * yd;
-				t = -beta / (2 * alpha);
+				t = -D / (2 * A);
 				if (t > 0 && t < 1) {
 					edgeHasMinima[e3] = true;
-					float edgeCritX = x0 + t * xd;
-					float edgeCritY = y0 + t * yd;
-					edgeCenters[3 * e3 + 0] = edgeCritX;
-					edgeCenters[3 * e3 + 1] = edgeCritY;
-					edgeCenters[3 * e3 + 2] = v1_z;
-					float edgeMinVal = A * edgeCritX * edgeCritX
-							+ B * edgeCritX * edgeCritY
-							+ C * edgeCritY * edgeCritY + D * edgeCritX
-							+ E * edgeCritX + F;
-					edgeMinValues[e3] = edgeMinVal;
+					alpha = t;
+					beta = 0;
+					gamma = 1 - t;
+					edgeCenters[3 * e3 + 0] = alpha * v1_x + gamma * v3_x;
+					edgeCenters[3 * e3 + 1] = alpha * v1_y + gamma * v3_y;
+					edgeCenters[3 * e3 + 2] = alpha * v1_z + gamma * v3_z;
+					edgeMinValues[e3] = A * alpha * alpha + D * alpha + F;
 				}
 			} else {
-				hasCrit = false;
 				float symmX1 = -D / (2 * A);
 				float symmY1 = 0;
 				float symmX2 = 0;
 				float symmY2 = -D / B;
-				float symmIntersect12 = intersectSegments(v1_x, v1_y, v2_x,
-						v2_y, symmX1, symmY1, symmX2, symmY2);
-				float symmIntersect23 = intersectSegments(v2_x, v2_y, v3_x,
-						v3_y, symmX1, symmY1, symmX2, symmY2);
-				float symmIntersect13 = intersectSegments(v1_x, v1_y, v3_x,
-						v3_y, symmX1, symmY1, symmX2, symmY2);
+				float symmIntersect12 = intersectSegments(1, 0, 0, 1, symmX1,
+						symmY1, symmX2, symmY2);
+				float symmIntersect23 = intersectSegments(0, 1, 0, 0, symmX1,
+						symmY1, symmX2, symmY2);
+				float symmIntersect13 = intersectSegments(1, 0, 0, 0, symmX1,
+						symmY1, symmX2, symmY2);
 				bool intersects12 = symmIntersect12 >= 0
 						&& symmIntersect12 <= 1;
 				bool intersects23 = symmIntersect23 >= 0
@@ -342,50 +285,32 @@ private:
 						&& symmIntersect13 <= 1;
 				if (intersects12) {
 					edgeHasMinima[e1] = true;
-					float edgeCritX = v1_x + symmIntersect12 * (v2_x - v1_x);
-					float edgeCritY = v1_y + symmIntersect12 * (v2_y - v1_y);
-					edgeCenters[3 * e1 + 0] = edgeCritX;
-					edgeCenters[3 * e1 + 1] = edgeCritY;
-					edgeCenters[3 * e1 + 2] = v1_z;
-					float edgeMinVal = A * edgeCritX * edgeCritX
-							+ B * edgeCritX * edgeCritY
-							+ C * edgeCritY * edgeCritY + D * edgeCritX
-							+ E * edgeCritX + F;
-					edgeMinValues[e1] = edgeMinVal;
+					float alpha = 1 - symmIntersect12;
+					float beta = symmIntersect12;
+					edgeCenters[3 * e1 + 0] = alpha * v1_x + beta * v2_x;
+					edgeCenters[3 * e1 + 1] = alpha * v1_y + beta * v2_y;
+					edgeCenters[3 * e1 + 2] = alpha * v1_z + beta * v2_z;
+					edgeMinValues[e1] = A * alpha * alpha + B * alpha * beta
+							+ C * beta * beta + D * alpha + E * beta + F;
 				}
 				if (intersects13) {
 					edgeHasMinima[e3] = true;
-					float edgeCritX = v1_x + symmIntersect13 * (v3_x - v1_x);
-					float edgeCritY = v1_y + symmIntersect13 * (v3_y - v1_y);
-					edgeCenters[3 * e3 + 0] = edgeCritX;
-					edgeCenters[3 * e3 + 1] = edgeCritY;
-					edgeCenters[3 * e3 + 2] = v1_z;
-					float edgeMinVal = A * edgeCritX * edgeCritX
-							+ B * edgeCritX * edgeCritY
-							+ C * edgeCritY * edgeCritY + D * edgeCritX
-							+ E * edgeCritX + F;
-					edgeMinValues[e3] = edgeMinVal;
+					float alpha = 1 - symmIntersect13;
+					float gamma = symmIntersect13;
+					edgeCenters[3 * e3 + 0] = alpha * v1_x + gamma * v3_x;
+					edgeCenters[3 * e3 + 1] = alpha * v1_y + gamma * v3_y;
+					edgeCenters[3 * e3 + 2] = alpha * v1_z + gamma * v3_z;
+					edgeMinValues[e3] = A * alpha * alpha + D * alpha + F;
 				}
 				if (intersects23) {
 					edgeHasMinima[e2] = true;
-					float edgeCritX = v2_x + symmIntersect23 * (v3_x - v2_x);
-					float edgeCritY = v2_y + symmIntersect23 * (v3_y - v2_y);
-					edgeCenters[3 * e2 + 0] = edgeCritX;
-					edgeCenters[3 * e2 + 1] = edgeCritY;
-					edgeCenters[3 * e2 + 2] = v2_z;
-					float edgeMinVal = A * edgeCritX * edgeCritX
-							+ B * edgeCritX * edgeCritY
-							+ C * edgeCritY * edgeCritY + D * edgeCritX
-							+ E * edgeCritX + F;
-					edgeMinValues[e2] = edgeMinVal;
+					float beta = 1 - symmIntersect23;
+					float gamma = symmIntersect23;
+					edgeCenters[3 * e2 + 0] = beta * v2_x + gamma * v3_x;
+					edgeCenters[3 * e2 + 1] = beta * v2_y + gamma * v3_y;
+					edgeCenters[3 * e2 + 2] = beta * v2_z + gamma * v3_z;
+					edgeMinValues[e2] = C * beta * beta + E * beta + F;
 				}
-			}
-
-			triangleHasMinima[i] = hasCrit;
-			if (hasCrit) {
-				triangleCenters[3 * i] = critX;
-				triangleCenters[3 * i + 1] = critY;
-				triangleCenters[3 * i + 2] = critZ;
 			}
 		}
 
