@@ -240,6 +240,8 @@ int ttkTensorMonotonousSubdivision::doIt(std::vector<vtkDataSet*> &inputs,
 	}
 	output->SetCells(VTK_TRIANGLE, cells);
 
+	std::cout << MODULE_S "Added the points and cells." << std::endl; 
+	
 	// cell id
 	auto cellId = vtkSmartPointer < ttkSimplexIdTypeArray > ::New();
 	cellId->SetName("CellId");
@@ -251,7 +253,38 @@ int ttkTensorMonotonousSubdivision::doIt(std::vector<vtkDataSet*> &inputs,
 	cellDim->SetName("CellDimension");
 	cellDim->SetVoidArray(pointDim_.data(), pointDim_.size(), 1);
 	output->GetPointData()->AddArray(cellDim);
+	
+	// anisotropy
+	auto anisotropy = vtkSmartPointer < vtkFloatArray > ::New();
+	anisotropy->SetName("Anisotropy");
+	anisotropy->SetVoidArray(anisotropy_.data(), anisotropy_.size(), 1);
+	output->GetPointData()->AddArray(anisotropy);
+	
+	// determinant
+	auto determinant = vtkSmartPointer < vtkFloatArray > ::New();
+	determinant->SetName("Determinant");
+	determinant->SetVoidArray(determinant_.data(), determinant_.size(), 1);
+	output->GetPointData()->AddArray(determinant);
 
+	// trace
+	auto trace = vtkSmartPointer < vtkFloatArray > ::New();
+	trace->SetName("Trace");
+	trace->SetVoidArray(trace_.data(), trace_.size(), 1);
+	output->GetPointData()->AddArray(trace);
+	
+	// lambda1
+	auto lambda1 = vtkSmartPointer < vtkFloatArray > ::New();
+	lambda1->SetName("EigenValue_High");
+	lambda1->SetVoidArray(lambda1_.data(), lambda1_.size(), 1);
+	output->GetPointData()->AddArray(lambda1);
+	
+	// lambda2
+	auto lambda2 = vtkSmartPointer < vtkFloatArray > ::New();
+	lambda2->SetName("EigenValue_Low");
+	lambda2->SetVoidArray(lambda2_.data(), lambda2_.size(), 1);
+	output->GetPointData()->AddArray(lambda2);
+	
+	std::cout << MODULE_S "Added the data arrays." << std::endl; 
 	{
 		std::stringstream msg;
 		msg << MODULE_S
