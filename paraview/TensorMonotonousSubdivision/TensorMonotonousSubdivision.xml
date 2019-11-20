@@ -31,23 +31,72 @@
         <DataTypeDomain name="input_type">
           <DataType value="vtkDataSet"/>
         </DataTypeDomain>
-        <InputArrayDomain name="input_scalars" number_of_components="1">
-          <Property name="Input" function="FieldDataSelection" />
-        </InputArrayDomain>
         <Documentation>
           Data-set to process.
         </Documentation>
       </InputProperty>
 
       <IntVectorProperty
-          name="SubdivisionLevel"
-          label="Level of subdivisions"
-          command="SetSubdivisionLevel"
+          name="SubdivisionField"
+          label="Subdivide for"
+          command="SetSubdivisionField"
           number_of_elements="1"
-          default_values="1">
+          default_values="0">
+        <EnumerationDomain name="enum">
+          <Entry value="0" text="Anisotropy"/>
+          <Entry value="1" text="Determinant"/>
+        </EnumerationDomain>
         <Documentation>
-          Number of subdivisions of the original triangulation.
+          The invariant field for which the subdivision is generated.
         </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty
+         name="GenerateAnisotropyField"
+         label="Generate anisotropy"
+         command="SetGenerateAnisotropyField"
+         number_of_elements="1"
+         default_values="1" panel_visibility="advanced">
+        <BooleanDomain name="bool"/>
+         <Documentation>
+          Calculate anisotropy of the tensor and store as a point data array called "Anisotropy" in the output.
+         </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty
+         name="GenerateDeterminantField"
+         label="Generate determinant"
+         command="SetGenerateDeterminantField"
+         number_of_elements="1"
+         default_values="0" panel_visibility="advanced">
+        <BooleanDomain name="bool"/>
+         <Documentation>
+          Calculate determinant of the tensor and store as a point data array called "Determinant" in the output.
+         </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty
+         name="GenerateTraceField"
+         label="Generate trace"
+         command="SetGenerateTraceField"
+         number_of_elements="1"
+         default_values="0" panel_visibility="advanced">
+        <BooleanDomain name="bool"/>
+         <Documentation>
+          Calculate trace of the tensor and store as a point data array called "Trace" in the output.
+         </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty
+         name="GenerateEigenValuesField"
+         label="Generate Eigen values"
+         command="SetGenerateEigenValuesField"
+         number_of_elements="1"
+         default_values="0" panel_visibility="advanced">
+        <BooleanDomain name="bool"/>
+         <Documentation>
+          Calculate the Eigen values of the tensor and store as two point data arrays called "EigenValue_High" and "EigenValue_Low" in the output.
+         </Documentation>
       </IntVectorProperty>
 
       <IntVectorProperty
@@ -93,7 +142,11 @@
       </IntVectorProperty>
 
       <PropertyGroup panel_widget="Line" label="Input options">
-        <Property name="SubdivisionLevel" />
+        <Property name="SubdivisionField" />
+        <Property name="GenerateAnisotropyField" />
+        <Property name="GenerateDeterminantField" />
+        <Property name="GenerateTraceField" />
+        <Property name="GenerateEigenValuesField" />
       </PropertyGroup>
 
       <PropertyGroup panel_widget="Line" label="Testing">

@@ -3,11 +3,12 @@
 #include <array>
 
 void ttk::TensorMonotonousSubdivision::addOutputTriangle(int &offset,
-		const SimplexId &v1, const SimplexId &v2, const SimplexId &v3) {
+		const SimplexId &v1, const SimplexId &v2, const SimplexId &v3, const LongSimplexId &inputCellIndex) {
 	cells_.push_back(3);
 	cells_.push_back(v1);
 	cells_.push_back(v2);
 	cells_.push_back(v3);
+	originalCellMap_.push_back(inputCellIndex);
 	offset += 4;
 }
 

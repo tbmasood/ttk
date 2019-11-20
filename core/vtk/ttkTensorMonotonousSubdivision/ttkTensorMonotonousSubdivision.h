@@ -55,22 +55,31 @@ public:
 	// default ttk setters
 	vtkSetMacro(debugLevel_, int);
 
-	vtkGetMacro(SubdivisionLevel, unsigned int);
-	vtkSetMacro(SubdivisionLevel, unsigned int);
-
 	void SetThreadNumber(int threadNumber) {
 		ThreadNumber = threadNumber;
 		SetThreads();
 	}
+
 	void SetUseAllCores(bool onOff) {
 		UseAllCores = onOff;
 		SetThreads();
 	}
+	// end of default ttk setters
 
-	int FillInputPortInformation(int /*port*/, vtkInformation *info) override {
-		info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkUnstructuredGrid");
-		return 1;
-	}
+	vtkGetMacro(SubdivisionField, unsigned int);
+	vtkSetMacro(SubdivisionField, unsigned int);
+
+	vtkSetMacro(GenerateAnisotropyField, int);
+	vtkGetMacro(GenerateAnisotropyField, int);
+
+	vtkSetMacro(GenerateDeterminantField, int);
+	vtkGetMacro(GenerateDeterminantField, int);
+
+	vtkSetMacro(GenerateTraceField, int);
+	vtkGetMacro(GenerateTraceField, int);
+
+	vtkSetMacro(GenerateEigenValuesField, int);
+	vtkGetMacro(GenerateEigenValuesField, int);
 
 protected:
 	ttkTensorMonotonousSubdivision() {
@@ -80,27 +89,33 @@ protected:
 
 	TTK_SETUP();
 
+	virtual int FillInputPortInformation(int port, vtkInformation *info) override;
+	virtual int FillOutputPortInformation(int port,
+			vtkInformation *info) override;
+
 	/**
 	 * @brief Allocate an output array of same type that input array
 	 */
 	vtkSmartPointer<vtkDataArray>
-	AllocateScalarField(vtkDataArray *const inputScalarField,
+	AllocateField(vtkDataArray *const inputScalarField,
 			int ntuples) const;
 
-	int InterpolateScalarFields(vtkUnstructuredGrid *const input,
+	int InterpolateFields(vtkDataSet *const input,
 			vtkUnstructuredGrid *const output) const;
 
 private:
 	// number of subdivisions
-	unsigned int SubdivisionLevel {1};
+	unsigned int SubdivisionField {0};
+	bool GenerateAnisotropyField {true};
+	bool GenerateDeterminantField {false};
+	bool GenerateTraceField {false};
+	bool GenerateEigenValuesField {false};
 
 	// output 3D coordinates of generated points: old points first, then edge
 	// middles, then triangle barycenters
 	std::vector<float> points_ {};
 	// output triangles
 	std::vector<ttk::LongSimplexId> cells_ {};
-	// generated point cell id
-	std::vector<ttk::SimplexId> pointId_ {};
 	// generated points dimension: 0 vertex of parent triangulation, 1 edge
 	// middle, 2 triangle barycenter
 	std::vector<ttk::SimplexId> pointDim_ {};
@@ -111,5 +126,5 @@ private:
 	std::vector<float> lambda2_ {};
 
 	// base worker
-	ttk::TensorMonotonousSubdivision baseWorker_ {points_, cells_, pointId_, pointDim_, anisotropy_, determinant_, trace_, lambda1_, lambda2_};
+	ttk::TensorMonotonousSubdivision baseWorker_ {points_, cells_, pointDim_, anisotropy_, determinant_, trace_, lambda1_, lambda2_};
 };

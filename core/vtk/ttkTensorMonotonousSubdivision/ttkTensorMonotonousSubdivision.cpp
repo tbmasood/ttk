@@ -1,6 +1,6 @@
 #include <ttkTensorMonotonousSubdivision.h>
 
-#define MODULE_ERROR_S MODULE_S "Error: "
+#define MODULE_ERROR_S MODULE_TMS "Error: "
 #ifndef TTK_ENABLE_KAMIKAZE
 #define TTK_ABORT_KK(COND, MSG, RET)    \
   if(COND) {                            \
@@ -13,13 +13,33 @@
 
 vtkStandardNewMacro (ttkTensorMonotonousSubdivision);
 
-vtkSmartPointer<vtkDataArray> ttkTensorMonotonousSubdivision::AllocateScalarField(
-		vtkDataArray *const inputScalarField, int ntuples) const {
+int ttkTensorMonotonousSubdivision::FillInputPortInformation(int port,
+		vtkInformation *info) {
+	switch (port) {
+	case 0:
+		info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkDataSet");
+		break;
+	}
+	return 1;
+}
+
+int ttkTensorMonotonousSubdivision::FillOutputPortInformation(int port,
+		vtkInformation *info) {
+	switch (port) {
+	case 0:
+		info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkUnstructuredGrid");
+		break;
+	}
+	return 1;
+}
+
+vtkSmartPointer<vtkDataArray> ttkTensorMonotonousSubdivision::AllocateField(
+		vtkDataArray *const inputField, int ntuples) const {
 
 	vtkSmartPointer < vtkDataArray > res { };
 
 	// allocate the memory for the output scalar field
-	switch (inputScalarField->GetDataType()) {
+	switch (inputField->GetDataType()) {
 	case VTK_CHAR:
 		res = vtkSmartPointer < vtkCharArray > ::New();
 		break;
@@ -40,96 +60,99 @@ vtkSmartPointer<vtkDataArray> ttkTensorMonotonousSubdivision::AllocateScalarFiel
 		break;
 	default:
 		std::stringstream msg;
-		msg << MODULE_S
+		msg << MODULE_TMS
 		"Unsupported data array type" << endl;
 		dMsg(std::cout, msg.str(), fatalMsg);
 		break;
 	}
-	res->SetNumberOfComponents(1);
+	res->SetNumberOfComponents(inputField->GetNumberOfComponents());
 	res->SetNumberOfTuples(ntuples);
-	res->SetName(inputScalarField->GetName());
+	res->SetName(inputField->GetName());
 	return res;
 }
 
-/*
- int ttkTensorMonotonousSubdivision::InterpolateScalarFields(
- vtkUnstructuredGrid *const input, vtkUnstructuredGrid *const output) const {
+int ttkTensorMonotonousSubdivision::InterpolateFields(
+		vtkDataSet *const input,
+		vtkUnstructuredGrid *const output) const {
 
- const size_t npointdata = input->GetPointData()->GetNumberOfArrays();
- const size_t ncelldata = input->GetCellData()->GetNumberOfArrays();
+	const size_t npointdata = input->GetPointData()->GetNumberOfArrays();
+	const size_t ncelldata = input->GetCellData()->GetNumberOfArrays();
 
- const auto outPointsNumber = baseWorker_.getNumberOfVertices();
+	const auto outPointsNumber = baseWorker_.getNumberOfVertices();
 
- for(size_t i = 0; i < npointdata; ++i) {
- auto inputScalarField = input->GetPointData()->GetArray(i);
- if(inputScalarField == nullptr) {
- return -2;
- }
+	for (size_t i = 0; i < npointdata; ++i) {
+		auto inputField = input->GetPointData()->GetArray(i);
+		if (inputField == nullptr) {
+			return -2;
+		}
 
- #define DISPATCH_INTERPOLATE_DIS(CASE, TYPE)                      \
-  case CASE:                                                      \
-    baseWorker_.interpolateDiscreteScalarField<TYPE>(             \
-      static_cast<TYPE *>(inputScalarField->GetVoidPointer(0)),   \
-      static_cast<TYPE *>(outputScalarField->GetVoidPointer(0))); \
+#define DISPATCH_INTERPOLATE_DIS(CASE, TYPE)                \
+  case CASE:                                                \
+    baseWorker_.interpolateDiscreteField<TYPE>(             \
+      static_cast<TYPE *>(inputField->GetVoidPointer(0)),   \
+      static_cast<TYPE *>(outputField->GetVoidPointer(0)),  \
+		inputField->GetNumberOfComponents());               \
     break
- #define DISPATCH_INTERPOLATE_CONT(CASE, TYPE)                     \
-  case CASE:                                                      \
-    baseWorker_.interpolateContinuousScalarField<TYPE>(           \
-      static_cast<TYPE *>(inputScalarField->GetVoidPointer(0)),   \
-      static_cast<TYPE *>(outputScalarField->GetVoidPointer(0))); \
+#define DISPATCH_INTERPOLATE_CONT(CASE, TYPE)               \
+  case CASE:                                                \
+    baseWorker_.interpolateContinuousField<TYPE>(           \
+      static_cast<TYPE *>(inputField->GetVoidPointer(0)),   \
+      static_cast<TYPE *>(outputField->GetVoidPointer(0)),  \
+		inputField->GetNumberOfComponents());               \
     break
 
- auto outputScalarField
- = AllocateScalarField(inputScalarField, outPointsNumber);
- if(outputScalarField == nullptr) {
- return -3;
- }
+		auto outputField = AllocateField(inputField, outPointsNumber);
+		if (outputField == nullptr) {
+			return -3;
+		}
 
- // only for scalar fields
- switch(inputScalarField->GetDataType()) {
- DISPATCH_INTERPOLATE_DIS(VTK_CHAR, char);
- DISPATCH_INTERPOLATE_DIS(VTK_INT, int);
- DISPATCH_INTERPOLATE_DIS(VTK_LONG, long);
- DISPATCH_INTERPOLATE_DIS(VTK_ID_TYPE, vtkIdType);
- DISPATCH_INTERPOLATE_CONT(VTK_FLOAT, float);
- DISPATCH_INTERPOLATE_CONT(VTK_DOUBLE, double);
- }
- output->GetPointData()->AddArray(outputScalarField);
- }
+		// only for scalar fields
+		switch (inputField->GetDataType()) {
+		DISPATCH_INTERPOLATE_DIS(VTK_CHAR, char)
+;			DISPATCH_INTERPOLATE_DIS(VTK_INT, int);
+			DISPATCH_INTERPOLATE_DIS(VTK_LONG, long);
+			DISPATCH_INTERPOLATE_DIS(VTK_ID_TYPE, vtkIdType);
+			DISPATCH_INTERPOLATE_CONT(VTK_FLOAT, float);
+			DISPATCH_INTERPOLATE_CONT(VTK_DOUBLE, double);
+		}
+		output->GetPointData()->AddArray(outputField);
+	}
 
- const auto outCellsNumber = baseWorker_.getNumberOfTriangles();
+	const auto outCellsNumber = baseWorker_.getNumberOfTriangles();
 
- for(size_t i = 0; i < ncelldata; ++i) {
- auto inputScalarField = input->GetCellData()->GetArray(i);
- if(inputScalarField == nullptr) {
- return -2;
- }
+	for (size_t i = 0; i < ncelldata; ++i) {
+		auto inputField = input->GetCellData()->GetArray(i);
+		if (inputField == nullptr) {
+			return -2;
+		}
 
- auto outputScalarField
- = AllocateScalarField(inputScalarField, outCellsNumber);
- if(outputScalarField == nullptr) {
- return -3;
- }
+		auto outputField = AllocateField(inputField, outCellsNumber);
+		if (outputField == nullptr) {
+			return -3;
+		}
 
- // only for scalar fields
- switch(inputScalarField->GetDataType()) {
- vtkTemplateMacro(baseWorker_.interpolateCellDataField<VTK_TT>(
- static_cast<VTK_TT *>(inputScalarField->GetVoidPointer(0)),
- static_cast<VTK_TT *>(outputScalarField->GetVoidPointer(0))));
- }
- output->GetCellData()->AddArray(outputScalarField);
- }
+		std::cout << MODULE_TMS
+		"Processing cell data array: " << inputField->GetName() << std::endl;
 
- return 0;
- }
- */
+		// only for scalar fields
+		switch (inputField->GetDataType()) {
+		vtkTemplateMacro(
+				baseWorker_.interpolateCellDataField < VTK_TT
+						> (static_cast<VTK_TT*>(inputField->GetVoidPointer(0)), static_cast<VTK_TT*>(outputField->GetVoidPointer(
+								0)), inputField->GetNumberOfComponents()));
+		}
+		output->GetCellData()->AddArray(outputField);
+	}
+
+	return 0;
+}
 
 int ttkTensorMonotonousSubdivision::doIt(std::vector<vtkDataSet*> &inputs,
 		std::vector<vtkDataSet*> &outputs) {
 
 	ttk::Memory m;
 
-	auto input = vtkUnstructuredGrid::SafeDownCast(inputs[0]);
+	vtkDataSet *input = inputs[0];
 	auto output = vtkUnstructuredGrid::SafeDownCast(outputs[0]);
 
 	auto triangulation = ttkTriangulation::getTriangulation(input);
@@ -141,25 +164,17 @@ int ttkTensorMonotonousSubdivision::doIt(std::vector<vtkDataSet*> &inputs,
 
 	triangulation->setWrapper(this);
 
-	// early return: copy input if no subdivision
-	if (SubdivisionLevel == 0) {
-		output->ShallowCopy(input);
-		return 0;
-	}
-
 	baseWorker_.setupTriangulation(triangulation);
 	baseWorker_.setWrapper(this);
 	baseWorker_.setOutputTriangulation(&triangulationSubdivision);
-	baseWorker_.setInputPoints(input->GetPoints()->GetVoidPointer(0));
-
 	baseWorker_.setTensorDataArray(
 			input->GetPointData()->GetTensors()->GetVoidPointer(0));
+	baseWorker_.setSubdivisionField(SubdivisionField);
+	baseWorker_.setGenerateAnisotropyField(GenerateAnisotropyField);
+	baseWorker_.setGenerateDeterminantField(GenerateDeterminantField);
+	baseWorker_.setGenerateTraceField(GenerateTraceField);
+	baseWorker_.setGenerateEigenValuesField(GenerateEigenValuesField);
 
-	std::cout << "Tensor array name : " << input->GetPointData()->GetTensors()->GetName() << std::endl;
-	std::cout << "Tensor type: " << input->GetPointData()->GetTensors()->GetDataType() << std::endl;
-	std::cout << "Tensor array size : " << input->GetPointData()->GetTensors()->GetSize() << std::endl;
-	std::cout << "Tensor data type size : " << input->GetPointData()->GetTensors()->GetDataTypeSize() << std::endl;
-	// first iteration: generate the new triangulation
 	switch (input->GetPointData()->GetTensors()->GetDataType()) {
 
 	case VTK_CHAR:
@@ -188,42 +203,15 @@ int ttkTensorMonotonousSubdivision::doIt(std::vector<vtkDataSet*> &inputs,
 
 	default:
 		std::stringstream msg;
-		msg << MODULE_S "Unsupported data type :(" << endl;
+		msg << MODULE_TMS
+		"Unsupported data type :(" << endl;
 		dMsg(cerr, msg.str(), fatalMsg);
 		return -3;
 	}
 
 	// first iteration: interpolate input scalar fields
-	//int ret = InterpolateScalarFields(input, output);
-	//TTK_ABORT_KK(ret < 0, "Error interpolating input data array(s)", -1);
-
-	for (unsigned int i = 1; i < SubdivisionLevel; ++i) {
-		// move previous points to temp vector
-		decltype(points_) tmpPoints { };
-		std::swap(points_, tmpPoints);
-		baseWorker_.setInputPoints(tmpPoints.data());
-
-		// move previous triangulation cells to temp vector
-		decltype(cells_) tmpCells { };
-		std::swap(cells_, tmpCells);
-
-		// move previous triangulation to temp triangulation
-		decltype(triangulationSubdivision) tmpTr { };
-		std::swap(triangulationSubdivision, tmpTr);
-
-		tmpTr.setInputCells(tmpCells.size() / 4, tmpCells.data());
-		tmpTr.setInputPoints(tmpPoints.size() / 3, tmpPoints.data());
-		baseWorker_.setupTriangulation(&tmpTr);
-		baseWorker_.setOutputTriangulation(&triangulationSubdivision);
-
-		// generate the new triangulation
-		//baseWorker_.execute();
-
-		// temporary vtkUnstructuredGrid moved from output
-		vtkSmartPointer < vtkUnstructuredGrid > tmp(std::move(output));
-		// interpolate from tmp to output
-		//InterpolateScalarFields(tmp, output);
-	}
+	int ret = InterpolateFields(input, output);
+	TTK_ABORT_KK(ret < 0, "Error interpolating input data array(s)", -1);
 
 	// generated 3D coordinates
 	auto points = vtkSmartPointer < vtkPoints > ::New();
@@ -240,54 +228,52 @@ int ttkTensorMonotonousSubdivision::doIt(std::vector<vtkDataSet*> &inputs,
 	}
 	output->SetCells(VTK_TRIANGLE, cells);
 
-	std::cout << MODULE_S "Added the points and cells." << std::endl; 
-	
-	// cell id
-	auto cellId = vtkSmartPointer < ttkSimplexIdTypeArray > ::New();
-	cellId->SetName("CellId");
-	cellId->SetVoidArray(pointId_.data(), pointId_.size(), 1);
-	output->GetPointData()->AddArray(cellId);
-
 	// cell dimension
 	auto cellDim = vtkSmartPointer < ttkSimplexIdTypeArray > ::New();
 	cellDim->SetName("CellDimension");
 	cellDim->SetVoidArray(pointDim_.data(), pointDim_.size(), 1);
 	output->GetPointData()->AddArray(cellDim);
-	
+
 	// anisotropy
-	auto anisotropy = vtkSmartPointer < vtkFloatArray > ::New();
-	anisotropy->SetName("Anisotropy");
-	anisotropy->SetVoidArray(anisotropy_.data(), anisotropy_.size(), 1);
-	output->GetPointData()->AddArray(anisotropy);
-	
+	if (GenerateAnisotropyField) {
+		auto anisotropy = vtkSmartPointer < vtkFloatArray > ::New();
+		anisotropy->SetName("Anisotropy");
+		anisotropy->SetVoidArray(anisotropy_.data(), anisotropy_.size(), 1);
+		output->GetPointData()->AddArray(anisotropy);
+	}
+
 	// determinant
-	auto determinant = vtkSmartPointer < vtkFloatArray > ::New();
-	determinant->SetName("Determinant");
-	determinant->SetVoidArray(determinant_.data(), determinant_.size(), 1);
-	output->GetPointData()->AddArray(determinant);
+	if (GenerateDeterminantField) {
+		auto determinant = vtkSmartPointer < vtkFloatArray > ::New();
+		determinant->SetName("Determinant");
+		determinant->SetVoidArray(determinant_.data(), determinant_.size(), 1);
+		output->GetPointData()->AddArray(determinant);
+	}
 
 	// trace
-	auto trace = vtkSmartPointer < vtkFloatArray > ::New();
-	trace->SetName("Trace");
-	trace->SetVoidArray(trace_.data(), trace_.size(), 1);
-	output->GetPointData()->AddArray(trace);
-	
-	// lambda1
-	auto lambda1 = vtkSmartPointer < vtkFloatArray > ::New();
-	lambda1->SetName("EigenValue_High");
-	lambda1->SetVoidArray(lambda1_.data(), lambda1_.size(), 1);
-	output->GetPointData()->AddArray(lambda1);
-	
-	// lambda2
-	auto lambda2 = vtkSmartPointer < vtkFloatArray > ::New();
-	lambda2->SetName("EigenValue_Low");
-	lambda2->SetVoidArray(lambda2_.data(), lambda2_.size(), 1);
-	output->GetPointData()->AddArray(lambda2);
-	
-	std::cout << MODULE_S "Added the data arrays." << std::endl; 
+	if (GenerateTraceField) {
+		auto trace = vtkSmartPointer < vtkFloatArray > ::New();
+		trace->SetName("Trace");
+		trace->SetVoidArray(trace_.data(), trace_.size(), 1);
+		output->GetPointData()->AddArray(trace);
+	}
+
+	// lambda1 and lambda2
+	if (GenerateEigenValuesField) {
+		auto lambda1 = vtkSmartPointer < vtkFloatArray > ::New();
+		lambda1->SetName("EigenValue_High");
+		lambda1->SetVoidArray(lambda1_.data(), lambda1_.size(), 1);
+		output->GetPointData()->AddArray(lambda1);
+
+		auto lambda2 = vtkSmartPointer < vtkFloatArray > ::New();
+		lambda2->SetName("EigenValue_Low");
+		lambda2->SetVoidArray(lambda2_.data(), lambda2_.size(), 1);
+		output->GetPointData()->AddArray(lambda2);
+	}
+
 	{
 		std::stringstream msg;
-		msg << MODULE_S
+		msg << MODULE_TMS
 		"Memory usage: " << m.getElapsedUsage() << " MB." << endl;
 		dMsg(std::cout, msg.str(), memoryMsg);
 	}
