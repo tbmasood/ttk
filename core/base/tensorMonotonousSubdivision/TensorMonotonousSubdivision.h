@@ -253,7 +253,9 @@ private:
 		std::vector<bool> triangleHasCriticalPoint(numInputTriangles_, false);
 		std::vector<float> triangleBarycenters(2 * numInputTriangles_, 0.0);
 
-		numDividedEdges_ = 0;
+#ifdef TTK_ENABLE_OPENMP
+#pragma omp parallel for num_threads(threadNumber_)
+#endif
 		for (SimplexId i = 0; i < numInputEdges_; ++i) {
 			SimplexId v1, v2;
 			inputTriangl_->getEdgeVertex(i, 0, v1);
@@ -267,17 +269,27 @@ private:
 			dataType v2_F = tensorData[9 * v2 + 1];
 			dataType v2_G = tensorData[9 * v2 + 4];
 
-			float A = (v2_E - v1_E - v2_G + v1_G) * (v2_E - v1_E - v2_G + v1_G)
-					+ 4 * (v2_F - v1_F) * (v2_F - v1_F);
-			float B = 2 * (v2_E - v1_E - v2_G + v1_G) * (v1_E - v1_G)
-					+ 8 * v1_F * (v2_F - v1_F);
-			float C = (v1_E - v1_G) * (v1_E - v1_G) + 4 * v1_F * v1_F;
+			float A = 0, B = 0, C = 0;
+			if (subdivisionField_ == 0) {
+				// anisotropy
+				A = (v2_E - v1_E - v2_G + v1_G) * (v2_E - v1_E - v2_G + v1_G)
+						+ 4 * (v2_F - v1_F) * (v2_F - v1_F);
+				B = 2 * (v2_E - v1_E - v2_G + v1_G) * (v1_E - v1_G)
+						+ 8 * v1_F * (v2_F - v1_F);
+				C = (v1_E - v1_G) * (v1_E - v1_G) + 4 * v1_F * v1_F;
+			} else {
+				// determinant
+				A = (v2_E - v1_E) * (v2_G - v1_G)
+						- (v2_F - v1_F) * (v2_F - v1_F);
+				B = v1_E * (v2_G - v1_G) + v1_G * (v2_E - v1_E)
+						- 2 * v1_F * (v2_F - v1_F);
+				C = v1_E * v1_G - v1_F * v1_F;
+			}
 			if (A != 0) {
 				float t = -B / (2 * A);
 				edgeBarycenters[i] = t;
 				if (t > 0 && t < 1) {
 					edgeHasCriticalPoint[i] = true;
-					numDividedEdges_++;
 					edgeCriticalValues[i] = A * t * t + B * t + C;
 				}
 			} else {
@@ -285,7 +297,9 @@ private:
 			}
 		}
 
-		numDividedTriangles_ = 0;
+#ifdef TTK_ENABLE_OPENMP
+#pragma omp parallel for num_threads(threadNumber_)
+#endif
 		for (SimplexId i = 0; i < numInputTriangles_; ++i) {
 			SimplexId v1, v2, v3;
 			inputTriangl_->getTriangleVertex(i, 0, v1);
@@ -304,6 +318,7 @@ private:
 			dataType v3_F = tensorData[9 * v3 + 1];
 			dataType v3_G = tensorData[9 * v3 + 4];
 
+			float A = 0, B = 0, C = 0, D = 0, E = 0;
 			float Ex = v1_E - v3_E;
 			float Fx = v1_F - v3_F;
 			float Gx = v1_G - v3_G;
@@ -316,11 +331,21 @@ private:
 			float Fc = v3_F;
 			float Gc = v3_G;
 
-			float A = (Ex - Gx) * (Ex - Gx) + 4 * Fx * Fx;
-			float B = 2 * (Ex - Gx) * (Ey - Gy) + 8 * Fx * Fy;
-			float C = (Ey - Gy) * (Ey - Gy) + 4 * Fy * Fy;
-			float D = 2 * (Ex - Gx) * (Ec - Gc) + 8 * Fx * Fc;
-			float E = 2 * (Ey - Gy) * (Ec - Gc) + 8 * Fy * Fc;
+			if (subdivisionField_ == 0) {
+				// anisotropy
+				A = (Ex - Gx) * (Ex - Gx) + 4 * Fx * Fx;
+				B = 2 * (Ex - Gx) * (Ey - Gy) + 8 * Fx * Fy;
+				C = (Ey - Gy) * (Ey - Gy) + 4 * Fy * Fy;
+				D = 2 * (Ex - Gx) * (Ec - Gc) + 8 * Fx * Fc;
+				E = 2 * (Ey - Gy) * (Ec - Gc) + 8 * Fy * Fc;
+			} else {
+				// determinant
+				A = Ex * Gx - Fx * Fx;
+				B = Ex * Gy + Ey * Gx - 2 * Fx * Fy;
+				C = Ey * Gy - Fy * Fy;
+				D = Ex * Gc + Ec * Gx - 2 * Fx * Fc;
+				E = Ey * Gc + Ec * Gy - 2 * Fy * Fc;
+			}
 
 			float H = 4 * A * C - B * B;
 
@@ -333,12 +358,33 @@ private:
 				triangleBarycenters[2 * i + 1] = beta;
 				hasCrit = alpha > 0 && beta > 0 && gamma > 0;
 				triangleHasCriticalPoint[i] = hasCrit;
-				if (hasCrit) {
-					numDividedTriangles_++;
-				}
 			} else {
 				triangleBarycenters[2 * i + 0] = 1;
 				triangleBarycenters[2 * i + 1] = 0;
+			}
+		}
+
+		std::vector < SimplexId > edgeIndexMap(numInputEdges_);
+		SimplexId index = numInputVertices_;
+		numDividedEdges_ = 0;
+		for (SimplexId i = 0; i < numInputEdges_; ++i) {
+			if (edgeHasCriticalPoint[i]) {
+				++numDividedEdges_;
+				edgeIndexMap[i] = index;
+				++index;
+			} else {
+				edgeIndexMap[i] = -1;
+			}
+		}
+		std::vector < SimplexId > triangleIndexMap(numInputTriangles_);
+		numDividedTriangles_ = 0;
+		for (SimplexId i = 0; i < numInputTriangles_; ++i) {
+			if (triangleHasCriticalPoint[i]) {
+				++numDividedTriangles_;
+				triangleIndexMap[i] = index;
+				++index;
+			} else {
+				triangleIndexMap[i] = -1;
 			}
 		}
 
@@ -348,28 +394,30 @@ private:
 		points_.resize(3 * numOutputVertices_);
 		pointDim_.clear();
 		pointDim_.resize(numOutputVertices_);
+		anisotropy_.clear();
+		determinant_.clear();
+		trace_.clear();
+		lambda1_.clear();
+		lambda2_.clear();
 		if (generateAnisotropyField_) {
-			anisotropy_.clear();
 			anisotropy_.resize(numOutputVertices_);
 		}
 		if (generateDeterminantField_) {
-			determinant_.clear();
 			determinant_.resize(numOutputVertices_);
 		}
 		if (generateTraceField_) {
-			trace_.clear();
 			trace_.resize(numOutputVertices_);
 		}
 		if (generateEigenValuesField_) {
-			lambda1_.clear();
 			lambda1_.resize(numOutputVertices_);
-			lambda2_.clear();
 			lambda2_.resize(numOutputVertices_);
 		}
 
+#ifdef TTK_ENABLE_OPENMP
+#pragma omp parallel for num_threads(threadNumber_)
+#endif
 		for (SimplexId i = 0; i < numInputVertices_; ++i) {
 			pointDim_[i] = 0;
-
 			dataType E = tensorData[9 * i];
 			dataType F = tensorData[9 * i + 1];
 			dataType G = tensorData[9 * i + 4];
@@ -403,10 +451,13 @@ private:
 		edgeBarycenters_.resize(numDividedEdges_);
 		pointEdgeMap_.clear();
 		pointEdgeMap_.resize(numDividedEdges_);
-		SimplexId index = numInputVertices_;
-		std::vector < SimplexId > edgeIndexMap(numInputEdges_);
+
+#ifdef TTK_ENABLE_OPENMP
+#pragma omp parallel for num_threads(threadNumber_)
+#endif
 		for (SimplexId i = 0; i < numInputEdges_; ++i) {
 			if (edgeHasCriticalPoint[i]) {
+				SimplexId edgeIndex = edgeIndexMap[i];
 				SimplexId v1, v2;
 				inputTriangl_->getEdgeVertex(i, 0, v1);
 				inputTriangl_->getEdgeVertex(i, 1, v2);
@@ -435,30 +486,25 @@ private:
 					anisotropy = anisotropy < 0 ? 0 : sqrt(anisotropy);
 				}
 				if (generateAnisotropyField_) {
-					anisotropy_[index] = anisotropy;
+					anisotropy_[edgeIndex] = anisotropy;
 				}
 				if (generateDeterminantField_) {
-					determinant_[index] = E * G - (F * F);
+					determinant_[edgeIndex] = E * G - (F * F);
 				}
 				if (generateTraceField_) {
-					trace_[index] = E + G;
+					trace_[edgeIndex] = E + G;
 				}
 				if (generateEigenValuesField_) {
-					lambda1_[index] = (E + G + anisotropy) / 2;
-					lambda2_[index] = (E + G - anisotropy) / 2;
+					lambda1_[edgeIndex] = (E + G + anisotropy) / 2;
+					lambda2_[edgeIndex] = (E + G - anisotropy) / 2;
 				}
 
 				pointDim_[index] = 1;
-				points_[3 * index + 0] = t * v2_x + (1 - t) * v1_x;
-				points_[3 * index + 1] = t * v2_y + (1 - t) * v1_y;
-				points_[3 * index + 2] = t * v2_z + (1 - t) * v1_z;
-				edgeBarycenters_[index - numInputVertices_] = t;
-				pointEdgeMap_[index - numInputVertices_] = i;
-
-				edgeIndexMap[i] = index;
-				++index;
-			} else {
-				edgeIndexMap[i] = -1;
+				points_[3 * edgeIndex + 0] = t * v2_x + (1 - t) * v1_x;
+				points_[3 * edgeIndex + 1] = t * v2_y + (1 - t) * v1_y;
+				points_[3 * edgeIndex + 2] = t * v2_z + (1 - t) * v1_z;
+				edgeBarycenters_[edgeIndex - numInputVertices_] = t;
+				pointEdgeMap_[edgeIndex - numInputVertices_] = i;
 			}
 		}
 
@@ -466,9 +512,13 @@ private:
 		triangleBarycenters_.resize(2 * numDividedTriangles_);
 		pointTriangleMap_.clear();
 		pointTriangleMap_.resize(numDividedTriangles_);
-		std::vector < SimplexId > triangleIndexMap(numInputTriangles_);
+
+#ifdef TTK_ENABLE_OPENMP
+#pragma omp parallel for num_threads(threadNumber_)
+#endif
 		for (SimplexId i = 0; i < numInputTriangles_; ++i) {
 			if (triangleHasCriticalPoint[i]) {
+				SimplexId triangleIndex = triangleIndexMap[i];
 				SimplexId v1, v2, v3;
 				inputTriangl_->getTriangleVertex(i, 0, v1);
 				inputTriangl_->getTriangleVertex(i, 1, v2);
@@ -506,38 +556,32 @@ private:
 					anisotropy = anisotropy < 0 ? 0 : sqrt(anisotropy);
 				}
 				if (generateAnisotropyField_) {
-					anisotropy_[index] = anisotropy;
+					anisotropy_[triangleIndex] = anisotropy;
 				}
 				if (generateDeterminantField_) {
-					determinant_[index] = E * G - (F * F);
+					determinant_[triangleIndex] = E * G - (F * F);
 				}
 				if (generateTraceField_) {
-					trace_[index] = E + G;
+					trace_[triangleIndex] = E + G;
 				}
 				if (generateEigenValuesField_) {
-					lambda1_[index] = (E + G + anisotropy) / 2;
-					lambda2_[index] = (E + G - anisotropy) / 2;
+					lambda1_[triangleIndex] = (E + G + anisotropy) / 2;
+					lambda2_[triangleIndex] = (E + G - anisotropy) / 2;
 				}
-				
-				SimplexId temp = 2
-						* (index - numInputVertices_ - numDividedEdges_);
-				triangleBarycenters_[temp] = alpha;
-				triangleBarycenters_[temp + 1] = beta;
-				pointTriangleMap_[index - numInputVertices_ - numDividedEdges_] =
-						i;
 
-				points_[3 * index + 0] = alpha * v1_x + beta * v2_x
+				SimplexId temp = triangleIndex - numInputVertices_
+						- numDividedEdges_;
+				triangleBarycenters_[2 * temp + 0] = alpha;
+				triangleBarycenters_[2 * temp + 1] = beta;
+				pointTriangleMap_[temp] = i;
+
+				pointDim_[triangleIndex] = 2;
+				points_[3 * triangleIndex + 0] = alpha * v1_x + beta * v2_x
 						+ gamma * v3_x;
-				points_[3 * index + 1] = alpha * v1_y + beta * v2_y
+				points_[3 * triangleIndex + 1] = alpha * v1_y + beta * v2_y
 						+ gamma * v3_y;
-				points_[3 * index + 2] = alpha * v1_z + beta * v2_z
+				points_[3 * triangleIndex + 2] = alpha * v1_z + beta * v2_z
 						+ gamma * v3_z;
-
-				pointDim_[index] = 2;
-				triangleIndexMap[i] = index;
-				++index;
-			} else {
-				triangleIndexMap[i] = -1;
 			}
 		}
 
@@ -634,6 +678,8 @@ private:
 					}
 					break;
 				case 2:
+					// This case is correctly handled for anisotropy subdivision
+					// TO DO: I am not sure if determinant subdivision is also correct
 					if (!edgeHasCriticalPoint[e1]) {
 						addOutputTriangle(cellIndex, v23, v13, v3, i);
 						if (edgeCriticalValues[e2] < edgeCriticalValues[e3]) {

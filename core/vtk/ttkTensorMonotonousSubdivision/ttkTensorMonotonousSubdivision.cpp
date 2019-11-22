@@ -106,7 +106,6 @@ int ttkTensorMonotonousSubdivision::InterpolateFields(
 			return -3;
 		}
 
-		// only for scalar fields
 		switch (inputField->GetDataType()) {
 		DISPATCH_INTERPOLATE_DIS(VTK_CHAR, char)
 ;			DISPATCH_INTERPOLATE_DIS(VTK_INT, int);
@@ -131,10 +130,6 @@ int ttkTensorMonotonousSubdivision::InterpolateFields(
 			return -3;
 		}
 
-		std::cout << MODULE_TMS
-		"Processing cell data array: " << inputField->GetName() << std::endl;
-
-		// only for scalar fields
 		switch (inputField->GetDataType()) {
 		vtkTemplateMacro(
 				baseWorker_.interpolateCellDataField < VTK_TT

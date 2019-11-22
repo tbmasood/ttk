@@ -143,6 +143,9 @@
 
       <PropertyGroup panel_widget="Line" label="Input options">
         <Property name="SubdivisionField" />
+      </PropertyGroup>
+
+      <PropertyGroup panel_widget="Line" label="Output fields">
         <Property name="GenerateAnisotropyField" />
         <Property name="GenerateDeterminantField" />
         <Property name="GenerateTraceField" />
