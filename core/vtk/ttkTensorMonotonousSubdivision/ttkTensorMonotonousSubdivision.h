@@ -45,91 +45,93 @@ class VTKFILTERSCORE_EXPORT ttkTensorMonotonousSubdivision
 #else
 class ttkTensorMonotonousSubdivision
 #endif
-: public vtkDataSetAlgorithm,
-public ttk::Wrapper {
+  : public vtkDataSetAlgorithm,
+    public ttk::Wrapper {
 
 public:
-	static ttkTensorMonotonousSubdivision *New();
-	vtkTypeMacro(ttkTensorMonotonousSubdivision, vtkDataSetAlgorithm);
+  static ttkTensorMonotonousSubdivision *New();
+  vtkTypeMacro(ttkTensorMonotonousSubdivision, vtkDataSetAlgorithm);
 
-	// default ttk setters
-	vtkSetMacro(debugLevel_, int);
+  // default ttk setters
+  vtkSetMacro(debugLevel_, int);
 
-	void SetThreadNumber(int threadNumber) {
-		ThreadNumber = threadNumber;
-		SetThreads();
-	}
+  void SetThreadNumber(int threadNumber) {
+    ThreadNumber = threadNumber;
+    SetThreads();
+  }
 
-	void SetUseAllCores(bool onOff) {
-		UseAllCores = onOff;
-		SetThreads();
-	}
-	// end of default ttk setters
+  void SetUseAllCores(bool onOff) {
+    UseAllCores = onOff;
+    SetThreads();
+  }
+  // end of default ttk setters
 
-	vtkGetMacro(SubdivisionField, unsigned int);
-	vtkSetMacro(SubdivisionField, unsigned int);
+  vtkGetMacro(SubdivisionField, unsigned int);
+  vtkSetMacro(SubdivisionField, unsigned int);
 
-	vtkSetMacro(GenerateAnisotropyField, int);
-	vtkGetMacro(GenerateAnisotropyField, int);
+  vtkSetMacro(GenerateAnisotropyField, int);
+  vtkGetMacro(GenerateAnisotropyField, int);
 
-	vtkSetMacro(GenerateDeterminantField, int);
-	vtkGetMacro(GenerateDeterminantField, int);
+  vtkSetMacro(GenerateDeterminantField, int);
+  vtkGetMacro(GenerateDeterminantField, int);
 
-	vtkSetMacro(GenerateTraceField, int);
-	vtkGetMacro(GenerateTraceField, int);
+  vtkSetMacro(GenerateTraceField, int);
+  vtkGetMacro(GenerateTraceField, int);
 
-	vtkSetMacro(GenerateEigenValuesField, int);
-	vtkGetMacro(GenerateEigenValuesField, int);
+  vtkSetMacro(GenerateEigenValuesField, int);
+  vtkGetMacro(GenerateEigenValuesField, int);
 
 protected:
-	ttkTensorMonotonousSubdivision() {
-		SetNumberOfInputPorts(1);
-		SetNumberOfOutputPorts(1);
-	}
+  ttkTensorMonotonousSubdivision() {
+    SetNumberOfInputPorts(1);
+    SetNumberOfOutputPorts(1);
+  }
 
-	TTK_SETUP();
+  TTK_SETUP();
 
-	virtual int FillInputPortInformation(int port, vtkInformation *info) override;
-	virtual int FillOutputPortInformation(int port,
-			vtkInformation *info) override;
+  virtual int FillInputPortInformation(int port, vtkInformation *info) override;
+  virtual int FillOutputPortInformation(int port,
+                                        vtkInformation *info) override;
 
-	/**
-	 * @brief Allocate an output array of same type that input array
-	 */
-	vtkSmartPointer<vtkDataArray>
-	AllocateField(vtkDataArray *const inputScalarField,
-			int ntuples) const;
+  /**
+   * @brief Allocate an output array of same type that input array
+   */
+  vtkSmartPointer<vtkDataArray>
+    AllocateField(vtkDataArray *const inputScalarField, int ntuples) const;
 
-	int InterpolateFields(vtkDataSet *const input,
-			vtkUnstructuredGrid *const output) const;
+  int InterpolateFields(vtkDataSet *const input,
+                        vtkUnstructuredGrid *const output) const;
 
 private:
-	/**
-	 * The criteria for mesh subdivision. If set to 0, then subdivision is done based on 
-	 * anisotropy. If set to 1, then subdivision is done based on determinant.
-	 */
-	unsigned int SubdivisionField {0};
-	bool GenerateAnisotropyField {true};
-	bool GenerateDeterminantField {false};
-	bool GenerateTraceField {false};
-	bool GenerateEigenValuesField {false};
+  /**
+   * The criteria for mesh subdivision. If set to 0, then subdivision is done
+   * based on anisotropy. If set to 1, then subdivision is done based on
+   * determinant.
+   */
+  unsigned int SubdivisionField{0};
+  bool GenerateAnisotropyField{true};
+  bool GenerateDeterminantField{false};
+  bool GenerateTraceField{false};
+  bool GenerateEigenValuesField{false};
 
-	// output 3D coordinates of generated points: old points first, then edge
-	// critical points, then triangle critical points
-	std::vector<float> points_ {};
-	// output triangles
-	std::vector<ttk::LongSimplexId> cells_ {};
-	// generated points dimension: 0 vertex of parent triangulation, 1 edge
-	// middle, 2 triangle barycenter
-	std::vector<ttk::SimplexId> pointDim_ {};
-	std::vector<float> anisotropy_ {};
-	std::vector<float> determinant_ {};
-	std::vector<float> trace_ {};
-	// The larger Eigen value
-	std::vector<float> lambda1_ {};
-	// Smaller Eigen value
-	std::vector<float> lambda2_ {};
+  // output 3D coordinates of generated points: old points first, then edge
+  // critical points, then triangle critical points
+  std::vector<float> points_{};
+  // output triangles
+  std::vector<ttk::LongSimplexId> cells_{};
+  // generated points dimension: 0 vertex of parent triangulation, 1 edge
+  // middle, 2 triangle barycenter
+  std::vector<ttk::SimplexId> pointDim_{};
+  std::vector<float> anisotropy_{};
+  std::vector<float> determinant_{};
+  std::vector<float> trace_{};
+  // The larger Eigen value
+  std::vector<float> lambda1_{};
+  // Smaller Eigen value
+  std::vector<float> lambda2_{};
 
-	// base worker
-	ttk::TensorMonotonousSubdivision baseWorker_ {points_, cells_, pointDim_, anisotropy_, determinant_, trace_, lambda1_, lambda2_};
+  // base worker
+  ttk::TensorMonotonousSubdivision baseWorker_{
+    points_,      cells_, pointDim_, anisotropy_,
+    determinant_, trace_, lambda1_,  lambda2_};
 };
