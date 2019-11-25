@@ -3,23 +3,37 @@
 /// \author Talha Bin Masood (talha.bin.masood@liu.se)
 /// \date November 2019
 ///
-/// \brief Subdivise a triangulation according to triangle barycenter
+/// \brief Subdivide a triangulation according to tensor invariant.
 ///
-/// %TensorMonotonousSubdivision generates a new, finer triangulation from
-/// an input triangulation. Every triangle is divided in six new
-/// triangles using the 3 edges middles and the triangle barycenter.
+/// Under linear interpolation of tensor components, tensor invariants 
+/// like anisotropy and determinant are quadratic. To compute the contour 
+/// tree correctly for these invariants, it is thus important to subdivide
+/// the input mesh into set of triangles where these invariants have 
+/// monotonous behaviour.
 ///
-/// Scalar data on vertices (point data) with continuous values
+/// We assume 2D symmteric tensors are provided at the mesh vertices:
+/// ( e f )
+/// ( f g )
+///
+/// This class allows subdivison of 2D tensor meshes into monotonous 
+/// triangle meshes based on two invariants:
+/// 1. Anisotropy: defined as the difference between Eigen values, 
+///    or sqrt((e-g)^2 + 4*f^2)
+/// 2. Determinant: the determinant of the tensor (e*g - f^2)
+/// 
+/// Data on vertices (point data) with continuous values
 /// (float/double) can be interpolated on the new
 /// triangulation. Scalar data on input triangles can be replicated on
 /// the new triangles.
 ///
+/// \b Related \b publications \n
+/// "Topology-guided Tessellation of Quadratic Elements" \n
+/// Scott Dillard, Vijay Natarajan, Gunther Weber, Valerio Pascucci and Bernd Hamann\n
+/// J. Computational Geometry and Applications, 19(2), 2009 \n
+///
 /// \sa ttk::Triangulation
-/// \sa ttkTensorMonotonousSubdivision.cpp %for a usage example.
 
 #pragma once
-
-#include <type_traits>
 
 // base code includes
 #include <Triangulation.h>
@@ -58,13 +72,15 @@ public:
 		numInputTriangles_ = inputTriangl_->getNumberOfTriangles();
 	}
 
-	/** @brief Return the number of vertices in the output triangulation
+	/**
+	 * @brief Return the number of vertices in the output triangulation
 	 */
 	inline SimplexId getNumberOfVertices() const {
 		return numOutputVertices_;
 	}
 
-	/** @brief Return the number of triangles in the output triangulation
+	/**
+	 * Return the number of triangles in the output triangulation
 	 */
 	inline LongSimplexId getNumberOfTriangles() const {
 		return numOutputTriangles_;
@@ -90,39 +106,67 @@ public:
 		return 0;
 	}
 
-	void setTensorDataArray(void *tensorData) {
+	/** 
+	 * @brief Set the tensor field for the input points. Although each tensor is given as a 
+	 * 3x3 tensor in this array, but during computation we assume 2x2 symmteric tensor 
+	 * is given for each point. So:
+	 * 
+	 * Input tensor ( a b c )  is treated as ( a b 0 )
+	 *              ( d e f )                ( b e 0 )
+	 *              ( g h i )                ( 0 0 0 )
+	 */
+	inline void setTensorDataArray(void *tensorData) {
 		tensorData_ = tensorData;
 	}
 
-	int setSubdivisionField(const unsigned int subdivisionField) {
+	/**
+	 * @brief Sets the criteria for mesh subdivision.
+	 * 
+	 * @param[subdivisionField] If set to 0, then subdivision is done based on 
+	 * anisotropy. If set to 1, then subdivision is done based on determinant.
+	 */
+	inline void setSubdivisionField(const unsigned int subdivisionField) {
 		subdivisionField_ = subdivisionField;
-		return 0;
-	}
-
-	int setGenerateAnisotropyField(const bool generateAnisotropyField) {
-		generateAnisotropyField_ = generateAnisotropyField;
-		return 0;
-	}
-
-	int setGenerateDeterminantField(const bool generateDeterminantField) {
-		generateDeterminantField_ = generateDeterminantField;
-		return 0;
-	}
-
-	int setGenerateTraceField(const bool generateTraceField) {
-		generateTraceField_ = generateTraceField;
-		return 0;
-	}
-
-	int setGenerateEigenValuesField(const bool generateEigenValuesField) {
-		generateEigenValuesField_ = generateEigenValuesField;
-		return 0;
 	}
 
 	/**
-	 * @brief Interpolate floating-point point data on subdivised triangulation
+	 * @brief A flag to set if tensor anisotropy should be computed for each 
+	 * vertex in the output mesh.
+	 */
+	inline void setGenerateAnisotropyField(const bool generateAnisotropyField) {
+		generateAnisotropyField_ = generateAnisotropyField;
+	}
+
+	/**
+	 * @brief A flag to set if tensor determinant should be computed for each 
+	 * vertex in the output mesh.
+	 */
+	inline void setGenerateDeterminantField(
+			const bool generateDeterminantField) {
+		generateDeterminantField_ = generateDeterminantField;
+	}
+
+	/**
+	 * @brief A flag to set if tensor trace should be computed for each 
+	 * vertex in the output mesh.
+	 */
+	inline void setGenerateTraceField(const bool generateTraceField) {
+		generateTraceField_ = generateTraceField;
+	}
+
+	/**
+	 * @brief A flag to set if tensor eigen values should be computed for each 
+	 * vertex in the output mesh.
+	 */
+	inline void setGenerateEigenValuesField(
+			const bool generateEigenValuesField) {
+		generateEigenValuesField_ = generateEigenValuesField;
+	}
+
+	/**
+	 * @brief Interpolate floating-point point data on subdivised triangulation.
 	 *
-	 * Copy values on parent vertices, interpolate on edges and barycenters
+	 * Copy values on parent vertices, interpolate on edges and triangle centers
 	 *
 	 * @param[in] data Pointer to input data on parent triangulation
 	 * @param[out] output Allocated buffer to be filled
@@ -179,7 +223,7 @@ public:
 	}
 
 	/**
-	 * @brief Interpolate integer point data on subdivised triangulation
+	 * @brief Interpolate integer point data on subdivided triangulation.
 	 *
 	 * Copy values on parent vertices, put 0 elsewhere.
 	 *
@@ -234,6 +278,12 @@ public:
 	}
 
 private:
+	/**
+	 * @brief The key method which generates the subdivision of a tensor mesh into a 
+	 * mesh with monotonous invariant behavior.
+	 * 
+	 * @return 0 in case of success
+	 */
 	template<typename dataType>
 	int subdivideTriangulation() {
 
@@ -241,7 +291,15 @@ private:
 		if (inputTriangl_->getDimensionality() >= 3) {
 			std::stringstream msg;
 			msg << MODULE_TMS
-			"Not yet implemented for dimension 3 and above" << std::endl;
+			"Not implemented for dimension 3 and above." << std::endl;
+			dMsg(std::cout, msg.str(), infoMsg);
+			return 1;
+		}
+
+		if (tensorData_ == nullptr) {
+			std::stringstream msg;
+			msg << MODULE_TMS
+			"Tensor data not available for this mesh." << std::endl;
 			dMsg(std::cout, msg.str(), infoMsg);
 			return 1;
 		}
@@ -357,11 +415,11 @@ private:
 				triangleBarycenters[2 * i + 0] = alpha;
 				triangleBarycenters[2 * i + 1] = beta;
 				hasCrit = alpha > 0 && beta > 0 && gamma > 0;
-				triangleHasCriticalPoint[i] = hasCrit;
 			} else {
-				triangleBarycenters[2 * i + 0] = 1;
-				triangleBarycenters[2 * i + 1] = 0;
+				triangleBarycenters[2 * i + 0] = 1 / 3.0;
+				triangleBarycenters[2 * i + 1] = 1 / 3.0;
 			}
+			triangleHasCriticalPoint[i] = hasCrit;
 		}
 
 		std::vector < SimplexId > edgeIndexMap(numInputEdges_);
@@ -586,8 +644,10 @@ private:
 		}
 
 		cells_.clear();
-		cells_.reserve(numInputTriangles_ * 4 * 6);
 		originalCellMap_.clear();
+		// Worst case, all the input triangles have a critical point and they need to be 
+		// divided into 6 triangles each.
+		cells_.reserve(numInputTriangles_ * 4 * 6);
 		originalCellMap_.reserve(numInputTriangles_ * 6);
 		SimplexId cellIndex = 0;
 		for (LongSimplexId i = 0; i < numInputTriangles_; ++i) {
@@ -622,6 +682,8 @@ private:
 					e3 = temp;
 				}
 			}
+			// After above steps, e1 is between v1 and v2, 
+			// e2 is between v2 and v3, and e3 is between v1 and v3
 
 			SimplexId v12, v23, v13, v123;
 			if (triangleHasCriticalPoint[i]) {
@@ -733,19 +795,25 @@ private:
 				}
 			}
 		}
+		// The size of cells_ is 4 times the number of generated output triangles.
 		cells_.resize(cellIndex);
 		numOutputTriangles_ = cellIndex / 4;
 		originalCellMap_.resize(numOutputTriangles_);
 		return 0;
 	}
 
+	/* 
+	 * @brief Builds the output triangulation after the points_ and cells_ lists
+	 * have been already generated by the subdivideTriangulation()
+	 */
 	int buildOutputTriangulation();
+
+	/* 
+	 * @brief Adds an output triangle in the cells_ list.
+	 */
 	void addOutputTriangle(int &offset, const SimplexId &v1,
 			const SimplexId &v2, const SimplexId &v3,
 			const LongSimplexId &inputCellIndex);
-	float intersectSegments(const float &x1, const float &y1, const float &x2,
-			const float &y2, const float &x3, const float &y3, const float &x4,
-			const float &y4);
 
 	unsigned int subdivisionField_ { 0 };
 	bool generateAnisotropyField_ { true };
@@ -753,35 +821,131 @@ private:
 	bool generateTraceField_ { false };
 	bool generateEigenValuesField_ { false };
 
+	/* 
+	 * @brief Number of vertices in the input triangulation.
+	 */
 	SimplexId numInputVertices_ { };
+
+	/* 
+	 * @brief Number of edges in the input triangulation.
+	 */
 	SimplexId numInputEdges_ { };
+
+	/* 
+	 * @brief Number of triangles in the input triangulation.
+	 */
 	SimplexId numInputTriangles_ { };
 
+	/* 
+	 * @brief Number of edges which have been divided because of presence of 
+	 * an edge critical point.
+	 */
 	SimplexId numDividedEdges_ { };
+
+	/* 
+	 * @brief Number of triangles which have been divided 
+	 * because of presence of a triangle critical point.
+	 */
 	SimplexId numDividedTriangles_ { };
 
+	/* 
+	 * @brief Number of vertices in the output triangulation, it should be equal to
+	 * (numInputVertices_ + numDividedEdges_ + numDividedTriangles_)
+	 */
 	SimplexId numOutputVertices_ { };
+
+	/* 
+	 * @brief Number of triangles in the output.
+	 */
 	SimplexId numOutputTriangles_ { };
 
+	/* 
+	 * @brief Pointer to input triangulation.
+	 */
 	Triangulation *inputTriangl_ { };
+
+	/* 
+	 * @brief Pointer to input tensor data array.
+	 */
 	void *tensorData_ { };
 
+	/* 
+	 * @brief Points in the output triangulation, saved as 
+	 * (x1, y1, z1, x2, y2, z2, ...)
+	 */
 	std::vector<float> &points_;
+
+	/* 
+	 * @brief Triangles in the output triangulation, saved as 
+	 * (3, t1v1, t1v2, t1v3, 3, t2v1, t2v2, t2v3, ...)
+	 */
 	std::vector<LongSimplexId> &cells_;
+
+	/* 
+	 * @brief The list containing the type of the output point:
+	 *  0 - input vertex
+	 *  1 - edge critical point
+	 *  2 - tringle critical point
+	 */
 	std::vector<SimplexId> &pointDim_;
+
+	/* 
+	 * @brief Tensor anisotropy value computed for each point of the output.
+	 */
 	std::vector<float> &anisotropy_;
+
+	/* 
+	 * @brief Tensor determinant computed for each point of the output.
+	 */
 	std::vector<float> &determinant_;
+
+	/* 
+	 * @brief Tensor trace computed for each point of the output.
+	 */
 	std::vector<float> &trace_;
+
+	/* 
+	 * @brief The larger of the Eigen values of the tensor computed for each point of the output.
+	 */
 	std::vector<float> &lambda1_;
+
+	/* 
+	 * @brief The smaller of the Eigen values of the tensor computed for each point of the output.
+	 */
 	std::vector<float> &lambda2_;
 
+	/* 
+	 * @brief A value between 0 and 1 is saved for edges which have an edge 
+	 * critical point, this value is used for interpolation of fields.
+	 */
 	std::vector<float> edgeBarycenters_ { };
+
+	/* 
+	 * @brief The barycentric coordinate of the critical point within the triangle
+	 * is saved which is used for interpolation.
+	 */
 	std::vector<float> triangleBarycenters_ { };
+
+	/* 
+	 * @brief For the edge critical points in the output, a mapping from point index 
+	 * to edge index in the input triangulation.
+	 */
 	std::vector<SimplexId> pointEdgeMap_ { };
+
+	/* 
+	 * @brief For the triangle critical points in the output, a mapping from point index 
+	 * to the triangle index in the input triangulation.
+	 */
 	std::vector<LongSimplexId> pointTriangleMap_ { };
+
+	/* 
+	 * @brief Map from traingle index in the output to the triangle index in the input.
+	 */
 	std::vector<LongSimplexId> originalCellMap_ { };
 
-	// output triangulation built on output points & output cells
+	/* 
+	 * @brief Output triangulation built on output points and output cells.
+	 */
 	Triangulation *outputTriangl_ { };
 };
 } // namespace ttk

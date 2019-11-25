@@ -1,15 +1,15 @@
 /// \ingroup vtk
 /// \class ttkTensorMonotonousSubdivision
-/// \author Your Name Here <Your Email Address Here>
-/// \date The Date Here.
+/// \author Talha Bin Masood <talha.bin.masood@liu.se>
+/// \date November 2019.
 ///
 /// \brief TTK VTK-filter that wraps the tensorMonotonousSubdivision processing
 /// package.
 ///
 /// VTK wrapping code for the @TensorMonotonousSubdivision package.
 ///
-/// \param Input Input scalar field (vtkDataSet)
-/// \param Output Output scalar field (vtkDataSet)
+/// \param Input Input grid or mesh (vtkDataSet)
+/// \param Output Output mesh (vtkUnstructuredGrid)
 ///
 /// This filter can be used as any other VTK filter (for instance, by using the
 /// sequence of calls SetInputData(), Update(), GetOutput()).
@@ -104,7 +104,10 @@ protected:
 			vtkUnstructuredGrid *const output) const;
 
 private:
-	// number of subdivisions
+	/**
+	 * The criteria for mesh subdivision. If set to 0, then subdivision is done based on 
+	 * anisotropy. If set to 1, then subdivision is done based on determinant.
+	 */
 	unsigned int SubdivisionField {0};
 	bool GenerateAnisotropyField {true};
 	bool GenerateDeterminantField {false};
@@ -112,7 +115,7 @@ private:
 	bool GenerateEigenValuesField {false};
 
 	// output 3D coordinates of generated points: old points first, then edge
-	// middles, then triangle barycenters
+	// critical points, then triangle critical points
 	std::vector<float> points_ {};
 	// output triangles
 	std::vector<ttk::LongSimplexId> cells_ {};
@@ -122,7 +125,9 @@ private:
 	std::vector<float> anisotropy_ {};
 	std::vector<float> determinant_ {};
 	std::vector<float> trace_ {};
+	// The larger Eigen value
 	std::vector<float> lambda1_ {};
+	// Smaller Eigen value
 	std::vector<float> lambda2_ {};
 
 	// base worker
