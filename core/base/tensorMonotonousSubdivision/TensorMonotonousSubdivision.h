@@ -311,9 +311,6 @@ private:
 		std::vector<bool> triangleHasCriticalPoint(numInputTriangles_, false);
 		std::vector<float> triangleBarycenters(2 * numInputTriangles_, 0.0);
 
-#ifdef TTK_ENABLE_OPENMP
-#pragma omp parallel for num_threads(threadNumber_)
-#endif
 		for (SimplexId i = 0; i < numInputEdges_; ++i) {
 			SimplexId v1, v2;
 			inputTriangl_->getEdgeVertex(i, 0, v1);
@@ -351,13 +348,10 @@ private:
 					edgeCriticalValues[i] = A * t * t + B * t + C;
 				}
 			} else {
-				edgeBarycenters[i] = 0;
+				edgeBarycenters[i] = 0.5;
 			}
 		}
 
-#ifdef TTK_ENABLE_OPENMP
-#pragma omp parallel for num_threads(threadNumber_)
-#endif
 		for (SimplexId i = 0; i < numInputTriangles_; ++i) {
 			SimplexId v1, v2, v3;
 			inputTriangl_->getTriangleVertex(i, 0, v1);
@@ -471,9 +465,6 @@ private:
 			lambda2_.resize(numOutputVertices_);
 		}
 
-#ifdef TTK_ENABLE_OPENMP
-#pragma omp parallel for num_threads(threadNumber_)
-#endif
 		for (SimplexId i = 0; i < numInputVertices_; ++i) {
 			pointDim_[i] = 0;
 			dataType E = tensorData[9 * i];
@@ -500,6 +491,7 @@ private:
 
 			float v_x, v_y, v_z;
 			inputTriangl_->getVertexPoint(i, v_x, v_y, v_z);
+			pointDim_[i] = 0;
 			points_[3 * i + 0] = v_x;
 			points_[3 * i + 1] = v_y;
 			points_[3 * i + 2] = v_z;
@@ -510,9 +502,6 @@ private:
 		pointEdgeMap_.clear();
 		pointEdgeMap_.resize(numDividedEdges_);
 
-#ifdef TTK_ENABLE_OPENMP
-#pragma omp parallel for num_threads(threadNumber_)
-#endif
 		for (SimplexId i = 0; i < numInputEdges_; ++i) {
 			if (edgeHasCriticalPoint[i]) {
 				SimplexId edgeIndex = edgeIndexMap[i];
@@ -557,7 +546,7 @@ private:
 					lambda2_[edgeIndex] = (E + G - anisotropy) / 2;
 				}
 
-				pointDim_[index] = 1;
+				pointDim_[edgeIndex] = 1;
 				points_[3 * edgeIndex + 0] = t * v2_x + (1 - t) * v1_x;
 				points_[3 * edgeIndex + 1] = t * v2_y + (1 - t) * v1_y;
 				points_[3 * edgeIndex + 2] = t * v2_z + (1 - t) * v1_z;
@@ -571,9 +560,6 @@ private:
 		pointTriangleMap_.clear();
 		pointTriangleMap_.resize(numDividedTriangles_);
 
-#ifdef TTK_ENABLE_OPENMP
-#pragma omp parallel for num_threads(threadNumber_)
-#endif
 		for (SimplexId i = 0; i < numInputTriangles_; ++i) {
 			if (triangleHasCriticalPoint[i]) {
 				SimplexId triangleIndex = triangleIndexMap[i];
