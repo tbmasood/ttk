@@ -1,10 +1,22 @@
 ## TTK - ChangeLog
 =
 ### ttk.git
+- Support for ParaView-5.7.0 \0/
+- New branching management
+- New templated triangulation API (up to x2 speedup)
+- New debugging API
+- New module API (simpler, clearer, more convenient)
+- Performance updates for the Morse-Smale complex (improved worstcase runtime with processlowerStar, IEEE PAMI 2011)
+
+
+### 0.9.8.9
 - Progressive Wasserstein Barycenters of Persistence Diagrams (IEEE VIS 2019)
 - Fast Wasserstein distance between Persistence Diagrams (auction+kd-tree)
 - Support for periodic grids
+- Improved dimension reduction (support for distance matrices)
+- Extended Cinema support (compression, improved SQL support)
 - VTK/Python API with conda-forge packaging
+- Updated examples
 - Fixes
 
 ### 0.9.8

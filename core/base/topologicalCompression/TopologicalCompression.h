@@ -135,7 +135,7 @@ namespace ttk {
     inline int setupTriangulation(Triangulation *triangulation) {
       triangulation_ = triangulation;
       if(triangulation_)
-        triangulation_->preprocessVertexNeighbors();
+        triangulation_->preconditionVertexNeighbors();
       return 0;
     }
 
@@ -857,7 +857,7 @@ int ttk::TopologicalCompression::ReadFromFile(FILE *fp) {
     }
   }
 
-  return 0;
+  return status;
 }
 
 template <typename T>
